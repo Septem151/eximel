@@ -1,0 +1,21 @@
+<program>
+  <decl name="greetee" type="str">World</decl>
+  <print>
+    Simple Print!
+  </print>
+  <print usevars="true">
+    Hello, {greetee}!
+  </print>
+  <decl name="a" type="int">5</decl>
+  <decl name="b" type="int">8</decl>
+  <decl name="res">
+    <add>
+      <var name="a" />
+      <var name="b" />
+      <num>3.66</num>
+    </add>
+  </decl>
+  <print usevars="true">
+    The result of {a}+{b}+3 is {res}
+  </print>
+</program>

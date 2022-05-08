@@ -1,0 +1,63 @@
+######
+eXiMeL
+######
+
+An esoteric programming language written in XML.
+
+This repo contains the eXiMeL interpreter.
+
+A simple hello world program would look like this:
+
+.. code-block:: xml
+
+  <program>
+    <print>
+      Hello, World!
+    </print>
+  </program>
+
+Variable declarations use the ``decl`` tag:
+
+.. code-block:: xml
+
+  <decl name="strVar" type="str">Septem151</decl>
+  <decl name="intVar" type="int">8</decl>
+  <decl name="floatVar" type="float">14.6</decl>
+
+Variable declaration can be nested for assigning (``type="infer"`` is optional):
+
+.. code-block:: xml
+
+  <decl name="a" type="int">5</decl>
+  <decl name="b" type="int">8</decl>
+  <decl name="sumVar" type="infer">
+    <add>
+      <var name="a" />
+      <var name="b" />
+    </add>
+  </decl>
+
+Literal ``num`` tags can be used within operations as well:
+
+.. code-block:: xml
+
+  <decl name="res">
+    <add>
+      <num>9.1</num>
+      <num>7</num>
+    </add>
+  </decl>
+
+Print statements can make use of variable substitution:
+
+.. code-block:: xml
+
+  <decl name="worldVar" type="str">World</decl>
+  <print usevars="true">
+    Hello, {worldVar}!
+  </print>
+
+Things to add:
+
+  * functions and the ability to use them within variable declarations and print statements
+  * other operations (subtract, multiply, divide)

@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "eximel"
+version = "0.1.0"
+description = "esoteric programming language interpreter for eXiMeL"
+authors = ["Carson Mullins <carsonmullins@yahoo.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+defusedxml = "^0.7.1"
+
+[tool.poetry.dev-dependencies]
+pytest = "^7.1.2"
+black = "^22.3.0"
+mypy = "^0.950"
+isort = "^5.10.1"
+pylint = "^2.13.8"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+
+[tool.pylint.format]
+max-line-length = "88"
+
+[tool.poetry.scripts]
+eximel = "eximel.cli:main"
