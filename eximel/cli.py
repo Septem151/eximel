@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from xml.etree.ElementTree import ParseError
 
+from defusedxml import DefusedXmlException
+
 from eximel import __version__, _description
 from eximel.exceptions import EximelError
 from eximel.parser import Parser
@@ -37,14 +39,16 @@ def run_script(script: Path) -> _CLIExit:
     """
     if not script.exists():
         return _CLIExit(2, f"{script}: No such file or directory")
-    with open(script, "r", encoding="utf-8") as file:
-        try:
+    try:
+        with open(script, "r", encoding="utf-8") as file:
             parser = Parser(file)
             parser.parse()
-        except ParseError:
-            return _CLIExit(1, f"{script}: Not in valid XML format")
-        except EximelError as error:
-            return _CLIExit(1, f"{script}: {error}")
+    except (ParseError, DefusedXmlException, UnicodeDecodeError):
+        return _CLIExit(1, f"{script}: Not in valid XML format")
+    except EximelError as error:
+        return _CLIExit(1, f"{script}: {error}")
+    except OSError as error:
+        return _CLIExit(2, f"{script}: {error.strerror or error}")
     return _CLIExit(0)
 
 

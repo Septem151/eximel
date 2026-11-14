@@ -48,6 +48,8 @@ Literal ``num`` tags can be used within operations as well:
     </add>
   </decl>
 
+The operators ``add``, ``sub``, ``mult`` and ``div`` are supported and can be nested.
+
 Print statements can make use of variable substitution:
 
 .. code-block:: xml
@@ -60,7 +62,6 @@ Print statements can make use of variable substitution:
 Things to add:
 
   * functions and the ability to use them within variable declarations and print statements
-  * other operations (subtract, multiply, divide)
 
 ============
 Installation
