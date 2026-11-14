@@ -1,4 +1,5 @@
 """Lexer for eximel"""
+import math
 import re
 import typing as t
 from io import TextIOWrapper
@@ -34,17 +35,25 @@ class Parser:
 
     def parse(self) -> None:
         program = self._xml.getroot()
+        if program is None or program.tag != "program":
+            raise EximelSyntaxError("Root element must be <program>")
         for cmd in program:
             if cmd.tag == "decl":
                 var_name, var_value = self._parse_decl(cmd)
                 self._variables[var_name] = var_value
-            if cmd.tag == "print":
+            elif cmd.tag == "print":
                 self._parse_print(cmd)
+            else:
+                raise EximelSyntaxError(f"Unknown command <{cmd.tag}>")
 
     def _get_var(self, var_name: str) -> t.Any:
-        variable = self._variables.get(var_name)
-        if not variable:
+        # a variable may legitimately hold a falsy value (0, 0.0, ""), so test
+        # for membership rather than truthiness
+        if var_name not in self._variables:
             raise EximelRuntimeError(f"var {var_name} does not exist")
+        variable = self._variables[var_name]
+        if variable is None:
+            raise EximelRuntimeError(f"var {var_name} has no value")
         return variable
 
     def _parse_decl(self, cmd: Element) -> tuple[str, t.Any]:
@@ -72,56 +81,86 @@ class Parser:
         subcmd = cmd[0]
         if subcmd.tag not in OPERATORS:
             raise EximelSyntaxError("Invalid operator as decl child")
-        if subcmd.tag == "add":
-            variable = self._parse_add(subcmd)
-            return var_name, variable
-        return var_name, "COMPLEX"
+        return var_name, self._parse_operation(subcmd)
 
-    def _parse_add(self, cmd: Element) -> int | float:
-        value: int | float = 0
+    def _parse_operand(self, cmd: Element) -> int | float:
+        if cmd.tag == "var":
+            if cmd.attrib.keys() != {"name"}:
+                raise EximelSyntaxError("Invalid var attributes")
+            variable = self._get_var(cmd.attrib["name"])
+            if isinstance(variable, bool) or not isinstance(variable, (int, float)):
+                raise EximelRuntimeError(
+                    f"var {cmd.attrib['name']} is not a number"
+                )
+            return variable
+        if cmd.tag == "num":
+            return Parser._parse_num(cmd)
+        if cmd.tag in OPERATORS:
+            return self._parse_operation(cmd)
+        raise EximelSyntaxError(f"Invalid operand <{cmd.tag}>")
+
+    def _parse_operation(self, cmd: Element) -> int | float:
         if len(cmd) == 0:
-            raise EximelSyntaxError("add must have children")
-        for subcmd in cmd:
-            if subcmd.tag == "var":
-                if subcmd.attrib.keys() != {"name"}:
-                    raise EximelSyntaxError("Invalid var attributes")
-                var_name = subcmd.attrib["name"]
-                variable = self._get_var(var_name)
-                value += variable
-            elif subcmd.tag == "num":
-                value += Parser._parse_num(subcmd)
-            else:
-                # handle function stuff here for add
-                continue
+            raise EximelSyntaxError(f"{cmd.tag} must have children")
+        operands = [self._parse_operand(subcmd) for subcmd in cmd]
+        value = operands[0]
+        if cmd.tag == "add":
+            for operand in operands[1:]:
+                value += operand
+        elif cmd.tag == "sub":
+            for operand in operands[1:]:
+                value -= operand
+        elif cmd.tag == "mult":
+            for operand in operands[1:]:
+                value *= operand
+        else:  # div
+            for operand in operands[1:]:
+                if operand == 0:
+                    raise EximelRuntimeError("Division by zero")
+                value /= operand
+            if isinstance(value, float) and value.is_integer():
+                value = int(value)
         return value
 
     @staticmethod
     def _parse_num(cmd: Element) -> int | float:
         if len(cmd.attrib) != 0:
             raise EximelSyntaxError("num cannot have attributes")
-        if not cmd.text:
+        if not cmd.text or not cmd.text.strip():
             raise EximelSyntaxError("num must have a value present")
+        text = cmd.text.strip()
         try:
-            val = float(cmd.text)
-            if val.is_integer():
-                return int(val)
-            return val
+            # try int first so large integers keep full precision
+            return int(text)
+        except ValueError:
+            pass
+        try:
+            val = float(text)
         except ValueError as error:
             raise EximelRuntimeError("Invalid number in num") from error
+        if not math.isfinite(val):
+            raise EximelRuntimeError("Invalid number in num")
+        if val.is_integer():
+            return int(val)
+        return val
 
     def _parse_print(self, cmd: Element) -> None:
         usevars_attr = cmd.attrib.get("usevars", "false")
         if usevars_attr not in {"true", "false"}:
             raise EximelRuntimeError("Invalid value for print usevars attribute")
         if usevars_attr == "true" and cmd.text:
-            text = cmd.text
-            for match in PRINT_REGEX.finditer(cmd.text):
-                variable_match = match.group()
-                variable = self._variables.get(variable_match[1:-1])
-                if not variable:
+
+            def substitute(match: re.Match) -> str:
+                name = match.group(1)
+                if name not in self._variables:
                     raise EximelRuntimeError("Referenced unknown variable from print")
-                text = text.replace(variable_match, str(variable))
-            print(text.strip())
+                variable = self._variables[name]
+                if variable is None:
+                    raise EximelRuntimeError(f"var {name} has no value")
+                return str(variable)
+
+            # single pass: substituted values are never re-scanned
+            print(PRINT_REGEX.sub(substitute, cmd.text).strip())
         elif not cmd.text:
             print()
         else:
